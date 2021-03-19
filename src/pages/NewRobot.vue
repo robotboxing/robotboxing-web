@@ -4,6 +4,11 @@
       <v-card color="grey lighten-4" flat>
         <v-toolbar class="elevation-0">
           <v-toolbar-title>New Robot</v-toolbar-title>
+          <v-spacer></v-spacer>
+          <v-btn color="success" class="mr-4" outlined @click="$router.go(-1)">
+            <v-icon left>mdi-arrow-left</v-icon>
+            Back
+          </v-btn>
         </v-toolbar>
       </v-card>
       <v-divider class="my-2"></v-divider>
@@ -16,7 +21,7 @@
                   <v-text-field
                     v-model="entity.name"
                     :counter="15"
-                    label="Name robot"
+                    label="Name robot*"
                     required
                     autocomplete="off"
                   ></v-text-field>
@@ -62,10 +67,22 @@
                     Generate Robot
                   </v-btn>
                 </v-col>
+
+                <v-col cols="12">
+                  <v-textarea
+                    v-model="entity.description"
+                    label="Description robot"
+                    :counter="150"
+                    rows="2"
+                    value=""
+                    :disabled="robotName === '' || robotName !== entity.name"
+                  ></v-textarea>
+                </v-col>
+
                 <v-col cols="12">
                   <v-currency-field
                     v-model="entity.amount"
-                    label="Pay amount"
+                    label="Pay amount*"
                     required
                     v-bind="currencyConfig"
                     :disabled="robotName === '' || robotName !== entity.name"
@@ -86,7 +103,17 @@
               {{ errorMsg }}
             </v-alert>
             <v-alert v-if="successRobot" outlined type="success" prominent>
-              Your robot has been successfully created
+              <v-row align="center">
+                <v-col class="grow">
+                  Your robot has been successfully created
+                </v-col>
+
+                <v-col class="shrink">
+                  <v-btn color="success" to="/my-robots">
+                    See my robot
+                  </v-btn>
+                </v-col></v-row
+              >
             </v-alert>
           </v-col>
         </v-row>
@@ -110,69 +137,27 @@
 </template>
 
 <script>
-import config from "@/configs";
-
 import "codemirror/lib/codemirror.css";
 import "@toast-ui/editor/dist/toastui-editor.css";
-
 import { Editor } from "@toast-ui/vue-editor";
-
-import NewProposalDialog from "@/lib/components/ui/NewProposalDialog";
 import TokenDialog from "@/lib/components/ui/TokenDialog";
-import ERC20Proxy from "@/lib/eth/ERC20Proxy";
-import HexHelper from "@/lib/helpers/HexHelper";
-
 import RoboView from "@/lib/components/ui/RoboView";
-
-import { Decimal } from "decimal.js";
-
 import IPFSHelper from "@/lib/helpers/IPFSHelper";
 import RobotBoxingProxy from "@/lib/eth/RobotBoxingProxy";
 
 export default {
   components: {
     Editor,
-    NewProposalDialog,
     TokenDialog,
     RoboView,
   },
 
   data() {
     return {
-      tab: 0,
-      enableCreateProposal: false,
-      newProposalDialog: false,
-
-      currentBlockNumber: 0,
-
-      tokenDialog: false,
-      tokenInfo: {},
-
       entity: {
         stars: 1,
         name: "",
       },
-      config,
-      drawer: null,
-      isContentBoxed: false,
-
-      tokenInfo: {},
-
-      inputTypes: ["uint256", "address", "bool", "bytes32", "string"],
-
-      headers: [
-        { text: "Type", value: "type", sortable: false, width: "200px" },
-        { text: "Value", value: "value", sortable: false },
-        { text: "Text", value: "text", sortable: false, width: "300px" },
-        { text: "Actions", value: "actions", sortable: false, width: "50px" },
-      ],
-
-      inputHeaders: [
-        { text: "Type", value: "type", sortable: false, width: "200px" },
-        { text: "Value", value: "value", sortable: false },
-        { text: "Actions", value: "actions", sortable: false, width: "50px" },
-      ],
-
       robotName: "",
       robotStars: 3,
       errorMsg: undefined,
@@ -188,22 +173,6 @@ export default {
     };
   },
 
-  watch: {
-    tab() {
-      if (this.tab === 3) {
-        this.enableCreateProposal = true;
-      }
-    },
-
-    "entity.erc20VotingPower"() {
-      this.updateTokenInfo();
-    },
-
-    isConnected() {
-      this.loadData();
-    },
-  },
-
   computed: {
     isConnected() {
       return this.$store.getters["user/isConnected"];
@@ -212,80 +181,9 @@ export default {
     account() {
       return this.$store.getters["user/account"];
     },
-
-    parsedData() {
-      return HexHelper.getOnlyValues(this.entity.data).join("\n");
-    },
-
-    parsedOptions() {
-      return HexHelper.getOnlyValues(this.entity.options).join("\n");
-    },
-
-    actualMinimumQuorum() {
-      Decimal.set({ toExpPos: 40 });
-
-      if (this.tokenInfo.found && !isNaN(this.entity.minimumQuorum)) {
-        try {
-          const number = Decimal(this.entity.minimumQuorum);
-          const actualMinimumQuorum = number.mul(
-            new Decimal(10).pow(this.tokenInfo.decimals)
-          );
-          const proportion = actualMinimumQuorum
-            .dividedBy(this.tokenInfo.totalSupply)
-            .mul(100)
-            .toFixed(2);
-
-          this.entity.rawMinimumQuorum = actualMinimumQuorum.toString();
-          this.entity.displayMinimumQuorum = `${this.entity.minimumQuorum} ${this.tokenInfo.symbol}`;
-          return `Raw value: ${this.entity.rawMinimumQuorum} (${proportion}%)`;
-        } catch (e) {
-          console.log(e);
-          return "";
-        }
-      }
-
-      return "";
-    },
-
-    blockLimitHint() {
-      return `Current block number is #${this.currentBlockNumber}`;
-    },
-  },
-
-  mounted() {
-    this.loadData();
   },
 
   methods: {
-    async loadCurrentBlockNumber() {
-      if (!this.isConnected) {
-        return;
-      }
-
-      this.currentBlockNumber = await web3.eth.getBlockNumber();
-    },
-
-    loadData() {
-      this.loadCurrentBlockNumber();
-    },
-
-    async updateTokenInfo() {
-      const proxy = new ERC20Proxy(this.entity.erc20VotingPower);
-      this.tokenInfo = await proxy.getInfo(this.account);
-    },
-
-    addOption() {
-      this.entity.options.push({});
-    },
-
-    addInput() {
-      this.entity.data.push({});
-    },
-
-    async addProposal() {
-      this.newProposalDialog = true;
-    },
-
     rulesMintRobot() {
       if (this.entity.name === "") {
         throw {
@@ -293,15 +191,12 @@ export default {
           code: "INVALID_NAME",
         };
       }
-      console.log(this.entity.amount);
-      console.log(this.minAmount);
       if (this.entity.amount <= 0 || this.minAmount > this.entity.amount) {
         throw {
           status: 409,
           code: "INVALID_MIN_AMOUNT",
         };
       }
-      console.log("teste");
       if (
         this.entity.stars === 1 &&
         (this.entity.name.length < 10 || this.entity.name.length > 15)
@@ -333,19 +228,22 @@ export default {
         this.errorMsg = "";
         this.rulesMintRobot();
 
+        const urlImage = `https://dynamic-robot.herokuapp.com/${
+          this.entity.stars
+        }/${this.entity.name.toLowerCase()}`;
+
+        const image = await fetch(urlImage);
+        const imageBuffer = await image.arrayBuffer();
+        const ipfsDataImage = await IPFSHelper.add(imageBuffer);
+
         const infoRobot = {
           name: this.entity.name.toLowerCase(),
-          description: `Robot generated for ${this.entity.name.toLowerCase()}. Ass: Sir Robot`,
-          image: `https://dynamic-robot.herokuapp.com/${
-            this.entity.stars
-          }/${this.entity.name.toLowerCase()}`,
+          description: this.entity.description,
+          image: `https://ipfs.io/ipfs/${ipfsDataImage.path}`,
           star: this.entity.stars,
         };
 
-        console.log(JSON.stringify(infoRobot));
-
         const ipfsData = await IPFSHelper.add(JSON.stringify(infoRobot));
-        console.log(ipfsData);
         const vpProxy = new RobotBoxingProxy();
 
         const newMint = {
@@ -355,14 +253,14 @@ export default {
           tokenURI: `https://ipfs.io/ipfs/${ipfsData.path}`,
         };
 
-        console.log(JSON.stringify(newMint));
-
         this.creating = true;
 
         this.transactionHash = await vpProxy.mintRobot(newMint, this.account);
         this.successRobot = true;
+        this.entity.name = "";
+        this.entity.description = "";
+        this.entity.amount = 0;
       } catch (error) {
-        console.log(error);
         switch (error.code) {
           case "INVALID_MIN_AMOUNT":
             this.errorMsg =
@@ -389,58 +287,13 @@ export default {
       }
     },
 
-    updateValue() {
-      this.entity.page = this.$refs.toastuiEditor.invoke("getHtml");
-    },
-
-    showHexValue(item) {
-      return HexHelper.get32BytesHexValue(item.type, item.value);
-    },
-
-    async showTokenDialog(contractAddress) {
-      try {
-        const proxy = new ERC20Proxy(contractAddress);
-        this.tokenInfo = await proxy.getInfo(this.account);
-        this.tokenDialog = true;
-      } catch (e) {
-        this.tokenInfo = {
-          contractAddress,
-          found: false,
-          symbol: "N/A",
-          name: "N/A",
-          totalSupply: "N/A",
-          balanceOf: "N/A",
-        };
-        this.tokenDialog = true;
-      }
-    },
-
-    copyCurrentBlock() {
-      this.entity.blockLimit = parseInt(this.currentBlockNumber);
-    },
-
-    closeTokenDialog() {
-      this.tokenDialog = false;
-    },
-
-    deleteOption(item) {
-      this.entity.options = this.entity.options.filter((o) => o !== item);
-    },
-
-    deleteInputData(item) {
-      this.entity.data = this.entity.data.filter((o) => o !== item);
-    },
-
     async updateImage() {
       this.robotName = this.entity.name;
       this.robotStars = this.entity.stars;
       const vpProxy = new RobotBoxingProxy();
       this.minAmount = await vpProxy.getMinBidByStar(this.entity.stars);
-      console.log(this.minAmount);
       this.minAmount += 0.0005;
-      console.log(this.minAmount);
       this.minAmount = this.minAmount.toFixed(4);
-      console.log(this.minAmount);
     },
   },
 };

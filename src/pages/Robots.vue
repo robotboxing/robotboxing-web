@@ -2,10 +2,14 @@
   <div>
     <v-card color="grey lighten-4" flat>
       <v-toolbar class="elevation-0">
-        <v-toolbar-title>My Robots</v-toolbar-title>
+        <v-toolbar-title>Robots</v-toolbar-title>
         <v-spacer></v-spacer>
+        <v-btn color="success" class="mr-4" outlined to="/my-robots">
+          My Robots
+        </v-btn>
+
         <v-btn color="success" class="mr-4" @click="goToNewRobot()">
-          New Robot
+          Create your Robot
           <v-icon right>mdi-file-star-outline</v-icon>
         </v-btn>
       </v-toolbar>
@@ -50,7 +54,39 @@
       </v-row>
     </v-container>
 
-    <v-container fluid v-if="loading">
+    <v-container fluid v-if="!loading">
+      <v-row dense>
+        <v-col cols="12" md="3">
+          <v-select
+            :items="itemsFilter"
+            v-model="selectFilter"
+            label="Star - Star - show all"
+            solo
+            @change="filterStar"
+          ></v-select>
+        </v-col>
+
+        <v-col cols="12" md="3">
+          <v-text-field
+            v-model="search"
+            :counter="15"
+            label="Search..."
+            required
+            solo
+            autocomplete="off"
+          >
+            <template v-slot:append>
+              <v-btn color="success" small outlined @click="searchName">
+                search
+                <v-icon class="ml-1" small>mdi-magnify</v-icon>
+              </v-btn>
+            </template>
+          </v-text-field>
+        </v-col>
+      </v-row>
+    </v-container>
+
+    <v-container fluid v-if="loading || filterLoading">
       <v-row dense>
         <v-col>
           <v-skeleton-loader
@@ -75,14 +111,14 @@
       </v-row>
     </v-container>
     <v-container fluid v-else>
-      <v-row dense>
+      <v-row dense v-if="myRobots.length">
         <v-col
           cols="12"
           md="3"
           :key="robot.response.name"
           v-for="robot in myRobots"
         >
-          <v-card class="mx-auto">
+          <v-card class="mx-auto" min-height="520">
             <v-card-title>{{ robot.response.name }}</v-card-title>
 
             <v-img height="354" :src="robot.response.image"></v-img>
@@ -91,6 +127,17 @@
               {{ robot.response.description }}
             </v-card-text>
           </v-card>
+        </v-col>
+      </v-row>
+      <v-row dense v-else>
+        <v-col cols="12" md="12">
+          <div class="text-center">
+            <h1 class="my-3">No robot was found</h1>
+            <v-btn color="success" @click="goToNewRobot()">
+              Create Robot
+              <v-icon right>mdi-file-star-outline</v-icon>
+            </v-btn>
+          </div>
         </v-col>
       </v-row>
     </v-container>
@@ -109,38 +156,18 @@
         </v-row>
       </v-container>
     </div>
-    <vote-dialog
-      :open="voteDialog"
-      :proposal="this.selectedProposal"
-      :content="this.selectedContent"
-      @close="closeVoteDialog"
-    />
   </div>
 </template>
 
 <script>
-import IPFSHelper from "@/lib/helpers/IPFSHelper";
-import VoteDialog from "@/lib/components/ui/Proposal/VoteDialog";
-import VotilityProtocolProxy from "@/lib/eth/VotilityProtocolProxy";
 import RobotBoxingProxy from "@/lib/eth/RobotBoxingProxy";
-import ERC20Proxy from "@/lib/eth/ERC20Proxy";
 import RoboHashAddress from "@/lib/components/ui/RoboHashAddress.vue";
-import TokenAmount from "@/lib/components/ui/TokenAmount.vue";
 import TransactionLink from "@/lib/components/ui/TransactionLink.vue";
-import MinimumQuorum from "@/lib/components/ui/Proposal/MinimumQuorum.vue";
-import QuorumProgressBar from "@/lib/components/ui/Proposal/QuorumProgressBar.vue";
-
-import MarkButton from "@/lib/components/ui/MarkButton";
 
 export default {
   components: {
-    VoteDialog,
     RoboHashAddress,
-    TokenAmount,
     TransactionLink,
-    MinimumQuorum,
-    QuorumProgressBar,
-    MarkButton,
   },
 
   data() {
@@ -149,8 +176,13 @@ export default {
       pageCount: 0,
       pageSize: 8,
       myRobots: [],
+      search: "",
 
       loading: true,
+      filterLoading: false,
+
+      itemsFilter: ["Star - show all", "1 Star", "2 Star", "3 Star"],
+      selectFilter: "Star - show all",
 
       countStar: [
         {
@@ -184,8 +216,12 @@ export default {
       this.loadData();
     },
 
+    account() {
+      this.loadData();
+    },
+
     page() {
-      this.loadProposals();
+      this.loadData();
     },
   },
 
@@ -206,7 +242,7 @@ export default {
       this.loading = true;
 
       try {
-        await Promise.all([this.loadMyRobots()]);
+        await Promise.all([this.loadMyRobots(), this.totalRobotsStar()]);
       } catch (e) {
         console.log(e);
       } finally {
@@ -220,24 +256,88 @@ export default {
       }
 
       const rbProxy = new RobotBoxingProxy();
-      const count = await rbProxy.getRobotsCount(this.account);
+      const count = await rbProxy.getRobotsCount();
 
       this.page = page || this.page;
       this.pageCount = Math.ceil(count / this.pageSize);
 
-      const myRobots = await rbProxy.getMyRobots(
+      const myRobots = await rbProxy.getRobots(this.pageSize, this.page - 1);
+
+      this.myRobots = myRobots.filter((robot) => robot.status === 200);
+    },
+
+    async totalRobotsStar() {
+      if (!this.isConnected) {
+        return;
+      }
+
+      const rbProxy = new RobotBoxingProxy();
+      const promises = [];
+
+      for (let star of this.countStar) {
+        promises.push(rbProxy.getRobotsByStarCount(star.star));
+      }
+
+      const promisesAll = await Promise.all(promises);
+
+      for (let index in this.countStar) {
+        this.countStar[index].count = promisesAll[index];
+      }
+    },
+
+    async filterStar() {
+      if (!this.isConnected) {
+        return;
+      }
+
+      if (this.selectFilter === "Star - show all") {
+        return this.loadData();
+      }
+
+      this.filterLoading = true;
+
+      const rbProxy = new RobotBoxingProxy();
+      const count = await rbProxy.getRobotsByStarCount(
+        parseInt(this.selectFilter)
+      );
+
+      this.pageCount = Math.ceil(count / this.pageSize);
+
+      const myRobots = await rbProxy.getRobotsFilterStar(
         this.pageSize,
         this.page - 1,
-        this.account
+        parseInt(this.selectFilter)
       );
+
       this.myRobots = myRobots.filter((robot) => robot.status === 200);
-      this.countStar.map((star) => {
-        star.count = this.myRobots.filter(
-          (robot) => robot.response.star === star.star
-        );
-        star.count = star.count.length;
-        console.log(star.count);
-      });
+
+      this.filterLoading = false;
+    },
+
+    async searchName() {
+      if (!this.isConnected) {
+        return;
+      }
+
+      if (this.search === "") {
+        return this.loadData();
+      }
+
+      this.filterLoading = true;
+
+      const rbProxy = new RobotBoxingProxy();
+      const robotIndex = await rbProxy.getRobotByName(this.search);
+      if (parseInt(robotIndex) === 0) {
+        this.myRobots = [];
+        this.filterLoading = false;
+        return;
+      }
+      const robot = await rbProxy.getRobot(robotIndex);
+      console.log(robot);
+
+      this.myRobots = [robot].filter((robot) => robot.status === 200);
+
+      this.filterLoading = false;
     },
 
     subscribeToEvents() {
