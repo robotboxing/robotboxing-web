@@ -41,7 +41,7 @@
 </template>
 
 <script>
-import VotilityProtocolProxy from '@/lib/eth/VotilityProtocolProxy';
+import RobotBoxingProxy from '@/lib/eth/RobotBoxingProxy';
 
 export default {
   data() {
@@ -126,13 +126,13 @@ export default {
         return;
       }
 
-      const proxy = new VotilityProtocolProxy();
-      const events = proxy.events();
+      // const proxy = new RobotBoxingProxy();
+      // const events = proxy.events();
 
-      events.allEvents({fromBlock: 0})
-      .on('data', (event) => {
-        this.parseNewEvent(event);
-      })
+      // events.allEvents({fromBlock: 0})
+      // .on('data', (event) => {
+      //   this.parseNewEvent(event);
+      // })
     }
   }
 }

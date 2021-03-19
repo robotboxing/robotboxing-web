@@ -137,29 +137,17 @@
 </template>
 
 <script>
-import config from "@/configs";
-
 import "codemirror/lib/codemirror.css";
 import "@toast-ui/editor/dist/toastui-editor.css";
-
 import { Editor } from "@toast-ui/vue-editor";
-
-import NewProposalDialog from "@/lib/components/ui/NewProposalDialog";
 import TokenDialog from "@/lib/components/ui/TokenDialog";
-import ERC20Proxy from "@/lib/eth/ERC20Proxy";
-import HexHelper from "@/lib/helpers/HexHelper";
-
 import RoboView from "@/lib/components/ui/RoboView";
-
-import { Decimal } from "decimal.js";
-
 import IPFSHelper from "@/lib/helpers/IPFSHelper";
 import RobotBoxingProxy from "@/lib/eth/RobotBoxingProxy";
 
 export default {
   components: {
     Editor,
-    NewProposalDialog,
     TokenDialog,
     RoboView,
   },
@@ -196,7 +184,6 @@ export default {
   },
 
   methods: {
-
     rulesMintRobot() {
       if (this.entity.name === "") {
         throw {
@@ -241,12 +228,18 @@ export default {
         this.errorMsg = "";
         this.rulesMintRobot();
 
+        const urlImage = `https://dynamic-robot.herokuapp.com/${
+          this.entity.stars
+        }/${this.entity.name.toLowerCase()}`;
+
+        const image = await fetch(urlImage);
+        const imageBuffer = await image.arrayBuffer();
+        const ipfsDataImage = await IPFSHelper.add(imageBuffer);
+
         const infoRobot = {
           name: this.entity.name.toLowerCase(),
           description: this.entity.description,
-          image: `https://dynamic-robot.herokuapp.com/${
-            this.entity.stars
-          }/${this.entity.name.toLowerCase()}`,
+          image: `https://ipfs.io/ipfs/${ipfsDataImage.path}`,
           star: this.entity.stars,
         };
 
@@ -264,8 +257,8 @@ export default {
 
         this.transactionHash = await vpProxy.mintRobot(newMint, this.account);
         this.successRobot = true;
-        this.entity.name = '';
-        this.entity.description = '';
+        this.entity.name = "";
+        this.entity.description = "";
         this.entity.amount = 0;
       } catch (error) {
         switch (error.code) {

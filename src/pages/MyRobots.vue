@@ -129,28 +129,14 @@
 </template>
 
 <script>
-import IPFSHelper from "@/lib/helpers/IPFSHelper";
-import VoteDialog from "@/lib/components/ui/Proposal/VoteDialog";
-import VotilityProtocolProxy from "@/lib/eth/VotilityProtocolProxy";
 import RobotBoxingProxy from "@/lib/eth/RobotBoxingProxy";
-import ERC20Proxy from "@/lib/eth/ERC20Proxy";
 import RoboHashAddress from "@/lib/components/ui/RoboHashAddress.vue";
-import TokenAmount from "@/lib/components/ui/TokenAmount.vue";
 import TransactionLink from "@/lib/components/ui/TransactionLink.vue";
-import MinimumQuorum from "@/lib/components/ui/Proposal/MinimumQuorum.vue";
-import QuorumProgressBar from "@/lib/components/ui/Proposal/QuorumProgressBar.vue";
-
-import MarkButton from "@/lib/components/ui/MarkButton";
 
 export default {
   components: {
-    VoteDialog,
     RoboHashAddress,
-    TokenAmount,
     TransactionLink,
-    MinimumQuorum,
-    QuorumProgressBar,
-    MarkButton,
   },
 
   data() {
@@ -194,8 +180,12 @@ export default {
       this.loadData();
     },
 
+    account() {
+      this.loadData();
+    },
+
     page() {
-      this.loadProposals();
+      this.loadData();
     },
   },
 
@@ -246,7 +236,6 @@ export default {
           (robot) => robot.response.star === star.star
         );
         star.count = star.count.length;
-        console.log(star.count);
       });
     },
 

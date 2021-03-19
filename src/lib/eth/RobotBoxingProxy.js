@@ -10,6 +10,10 @@ export default class RobotBoxingProxyProxy {
     );
   }
 
+  events() {
+    return this.smc.events;
+  }
+
   weiToEther(weiAmount) {
     return window.web3.utils.fromWei(weiAmount.toString(), "ether");
   }
@@ -45,6 +49,9 @@ export default class RobotBoxingProxyProxy {
   getRobotsCount() {
     return this.robotContract.methods.totalSupply().call();
   }
+  getRobotsByStarCount(star) {
+    return this.robotContract.methods.getRobotsByStarCount(star).call();
+  }
 
   tokenOfOwnerByIndex(account, index) {
     return this.robotContract.methods
@@ -60,6 +67,10 @@ export default class RobotBoxingProxyProxy {
 
   tokenURI(index) {
     return this.robotContract.methods.tokenURI(index).call();
+  }
+
+  getRobotByName(name) {
+    return this.robotContract.methods.getRobotByName(name).call();
   }
 
   async getMyRobot(index, account) {
@@ -130,6 +141,42 @@ export default class RobotBoxingProxyProxy {
 
     for (let i = start; i > start - pageLimit && i > 0; i--) {
       promises.push(this.getRobot(i));
+    }
+
+    return Promise.all(promises);
+  }
+
+  async getRobotStar(index, star) {
+    try {
+      const tokenURI = await this.getRobotUriByStarAndIndex(star, index);
+
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), 3000);
+      const getIPFS = await fetch(tokenURI, { signal: controller.signal });
+      const response = await getIPFS.json();
+
+      return {
+        status: 200,
+        code: "SUCCESS",
+        response: response,
+      };
+    } catch (error) {
+      return {
+        status: 409,
+        code: "ROBOT_NOT_LOAD",
+        response: {},
+      };
+    }
+  }
+
+  async getRobotsFilterStar(pageLimit, page, star) {
+    const count = await this.getRobotsByStarCount(star);
+    const start = count - pageLimit * page;
+
+    const promises = [];
+
+    for (let i = start; i > start - pageLimit && i > 0; i--) {
+      promises.push(this.getRobotStar(i - 1, star));
     }
 
     return Promise.all(promises);
