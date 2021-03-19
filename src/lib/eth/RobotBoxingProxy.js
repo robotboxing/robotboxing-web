@@ -4,7 +4,7 @@ import store from "@/store";
 export default class RobotBoxingProxyProxy {
   constructor() {
     this.contractAddress = store.getters["user/contractAddress"];
-    this.smc = new window.web3.eth.Contract(
+    this.robotContract = new window.web3.eth.Contract(
       RobotBoxingProxy.output.abi,
       this.contractAddress
     );
@@ -19,35 +19,47 @@ export default class RobotBoxingProxyProxy {
   }
 
   getRobotByName(name) {
-    return this.smc.methods.getRobotByName(name).call();
+    return this.robotContract.methods.getRobotByName(name).call();
   }
 
   async getLastBidByStar(star) {
-    const amount = await this.smc.methods.getLastBidByStar(star).call();
+    const amount = await this.robotContract.methods
+      .getLastBidByStar(star)
+      .call();
 
     return parseFloat(this.weiToEther(amount));
   }
 
   async getMinBidByStar(star) {
-    const amount = await this.smc.methods.getMinBidByStar(star).call();
+    const amount = await this.robotContract.methods
+      .getMinBidByStar(star)
+      .call();
 
     return parseFloat(this.weiToEther(amount));
   }
 
-  getRobotsCount(account) {
-    return this.smc.methods.balanceOf(account).call();
+  getRobotsAccountCount(account) {
+    return this.robotContract.methods.balanceOf(account).call();
+  }
+
+  getRobotsCount() {
+    return this.robotContract.methods.totalSupply().call();
   }
 
   tokenOfOwnerByIndex(account, index) {
-    return this.smc.methods.tokenOfOwnerByIndex(account, index).call();
+    return this.robotContract.methods
+      .tokenOfOwnerByIndex(account, index)
+      .call();
   }
 
   getRobotUriByStarAndIndex(star, index) {
-    return this.smc.methods.getRobotUriByStarAndIndex(star, index).call();
+    return this.robotContract.methods
+      .getRobotUriByStarAndIndex(star, index)
+      .call();
   }
 
   tokenURI(index) {
-    return this.smc.methods.tokenURI(index).call();
+    return this.robotContract.methods.tokenURI(index).call();
   }
 
   async getMyRobot(index, account) {
@@ -74,14 +86,50 @@ export default class RobotBoxingProxyProxy {
     }
   }
 
+  async getRobot(index) {
+    try {
+      const tokenURI = await this.tokenURI(index);
+
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), 3000);
+      const getIPFS = await fetch(tokenURI, { signal: controller.signal });
+      const response = await getIPFS.json();
+
+      return {
+        status: 200,
+        code: "SUCCESS",
+        response: response,
+      };
+    } catch (error) {
+      return {
+        status: 409,
+        code: "ROBOT_NOT_LOAD",
+        response: {},
+      };
+    }
+  }
+
   async getMyRobots(pageLimit, page, account) {
-    const count = await this.getRobotsCount(account);
+    const count = await this.getRobotsAccountCount(account);
     const start = count - pageLimit * page;
 
     const promises = [];
 
     for (let i = start; i > start - pageLimit && i > 0; i--) {
       promises.push(this.getMyRobot(i - 1, account));
+    }
+
+    return Promise.all(promises);
+  }
+
+  async getRobots(pageLimit, page) {
+    const count = await this.getRobotsCount();
+    const start = count - pageLimit * page;
+
+    const promises = [];
+
+    for (let i = start; i > start - pageLimit && i > 0; i--) {
+      promises.push(this.getRobot(i));
     }
 
     return Promise.all(promises);
@@ -110,18 +158,14 @@ export default class RobotBoxingProxyProxy {
     );
     const to = this.contractAddress;
 
-    console.log({
-      name,
-      star,
-      tokenURI,
-    });
-
     const txObject = {
       from,
       nonce,
       value: window.web3.utils.toHex(this.etherToWei(amount)),
       to,
-      data: this.smc.methods.mintRobot(name, star, tokenURI).encodeABI(),
+      data: this.robotContract.methods
+        .mintRobot(name, star, tokenURI)
+        .encodeABI(),
     };
 
     return new Promise((resolve, reject) => {

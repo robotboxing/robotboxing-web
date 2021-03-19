@@ -2,10 +2,14 @@
   <div>
     <v-card color="grey lighten-4" flat>
       <v-toolbar class="elevation-0">
-        <v-toolbar-title>My Robots</v-toolbar-title>
+        <v-toolbar-title>Robots</v-toolbar-title>
         <v-spacer></v-spacer>
+        <v-btn color="success" class="mr-4" outlined to="/my-robots">
+          My Robots
+        </v-btn>
+
         <v-btn color="success" class="mr-4" @click="goToNewRobot()">
-          New Robot
+          Create your Robot
           <v-icon right>mdi-file-star-outline</v-icon>
         </v-btn>
       </v-toolbar>
@@ -82,7 +86,7 @@
           :key="robot.response.name"
           v-for="robot in myRobots"
         >
-          <v-card class="mx-auto">
+          <v-card class="mx-auto" min-height="520">
             <v-card-title>{{ robot.response.name }}</v-card-title>
 
             <v-img height="354" :src="robot.response.image"></v-img>
@@ -109,21 +113,12 @@
         </v-row>
       </v-container>
     </div>
-    <vote-dialog
-      :open="voteDialog"
-      :proposal="this.selectedProposal"
-      :content="this.selectedContent"
-      @close="closeVoteDialog"
-    />
   </div>
 </template>
 
 <script>
-import IPFSHelper from "@/lib/helpers/IPFSHelper";
 import VoteDialog from "@/lib/components/ui/Proposal/VoteDialog";
-import VotilityProtocolProxy from "@/lib/eth/VotilityProtocolProxy";
 import RobotBoxingProxy from "@/lib/eth/RobotBoxingProxy";
-import ERC20Proxy from "@/lib/eth/ERC20Proxy";
 import RoboHashAddress from "@/lib/components/ui/RoboHashAddress.vue";
 import TokenAmount from "@/lib/components/ui/TokenAmount.vue";
 import TransactionLink from "@/lib/components/ui/TransactionLink.vue";
@@ -185,7 +180,7 @@ export default {
     },
 
     page() {
-      this.loadProposals();
+      this.loadData();
     },
   },
 
@@ -220,23 +215,19 @@ export default {
       }
 
       const rbProxy = new RobotBoxingProxy();
-      const count = await rbProxy.getRobotsCount(this.account);
+      const count = await rbProxy.getRobotsCount();
 
       this.page = page || this.page;
       this.pageCount = Math.ceil(count / this.pageSize);
 
-      const myRobots = await rbProxy.getMyRobots(
-        this.pageSize,
-        this.page - 1,
-        this.account
-      );
+      const myRobots = await rbProxy.getRobots(this.pageSize, this.page - 1);
+     
       this.myRobots = myRobots.filter((robot) => robot.status === 200);
       this.countStar.map((star) => {
         star.count = this.myRobots.filter(
           (robot) => robot.response.star === star.star
         );
         star.count = star.count.length;
-        console.log(star.count);
       });
     },
 

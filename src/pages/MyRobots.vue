@@ -4,6 +4,11 @@
       <v-toolbar class="elevation-0">
         <v-toolbar-title>My Robots</v-toolbar-title>
         <v-spacer></v-spacer>
+        <v-btn color="success" class="mr-4" outlined to="/">
+          <v-icon left>mdi-arrow-left</v-icon>
+          Back List Robots
+        </v-btn>
+
         <v-btn color="success" class="mr-4" @click="goToNewRobot()">
           New Robot
           <v-icon right>mdi-file-star-outline</v-icon>
@@ -75,14 +80,14 @@
       </v-row>
     </v-container>
     <v-container fluid v-else>
-      <v-row dense>
+      <v-row dense v-if="myRobots.length">
         <v-col
           cols="12"
           md="3"
           :key="robot.response.name"
           v-for="robot in myRobots"
         >
-          <v-card class="mx-auto">
+          <v-card class="mx-auto" min-height="520">
             <v-card-title>{{ robot.response.name }}</v-card-title>
 
             <v-img height="354" :src="robot.response.image"></v-img>
@@ -91,6 +96,17 @@
               {{ robot.response.description }}
             </v-card-text>
           </v-card>
+        </v-col>
+      </v-row>
+      <v-row dense v-else>
+        <v-col cols="12" md="12">
+          <div class="text-center">
+            <h1 class="my-3">You don't have robots</h1>
+            <v-btn color="success" @click="goToNewRobot()">
+              Create your first Robot
+              <v-icon right>mdi-file-star-outline</v-icon>
+            </v-btn>
+          </div>
         </v-col>
       </v-row>
     </v-container>
@@ -109,12 +125,6 @@
         </v-row>
       </v-container>
     </div>
-    <vote-dialog
-      :open="voteDialog"
-      :proposal="this.selectedProposal"
-      :content="this.selectedContent"
-      @close="closeVoteDialog"
-    />
   </div>
 </template>
 
@@ -220,7 +230,7 @@ export default {
       }
 
       const rbProxy = new RobotBoxingProxy();
-      const count = await rbProxy.getRobotsCount(this.account);
+      const count = await rbProxy.getRobotsAccountCount(this.account);
 
       this.page = page || this.page;
       this.pageCount = Math.ceil(count / this.pageSize);
