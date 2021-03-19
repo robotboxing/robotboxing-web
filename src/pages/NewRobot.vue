@@ -127,7 +127,7 @@ import RoboView from "@/lib/components/ui/RoboView";
 import { Decimal } from "decimal.js";
 
 import IPFSHelper from "@/lib/helpers/IPFSHelper";
-import SirRobotItemProxy from "@/lib/eth/SirRobotItemProxy";
+import RobotBoxingProxy from "@/lib/eth/RobotBoxingProxy";
 
 export default {
   components: {
@@ -346,7 +346,7 @@ export default {
 
         const ipfsData = await IPFSHelper.add(JSON.stringify(infoRobot));
         console.log(ipfsData);
-        const vpProxy = new SirRobotItemProxy();
+        const vpProxy = new RobotBoxingProxy();
 
         const newMint = {
           name: this.entity.name.toLowerCase(),
@@ -434,7 +434,7 @@ export default {
     async updateImage() {
       this.robotName = this.entity.name;
       this.robotStars = this.entity.stars;
-      const vpProxy = new SirRobotItemProxy();
+      const vpProxy = new RobotBoxingProxy();
       this.minAmount = await vpProxy.getMinBidByStar(this.entity.stars);
       console.log(this.minAmount);
       this.minAmount += 0.0005;
