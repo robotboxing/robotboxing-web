@@ -11,7 +11,7 @@
         <router-link to="/" class="d-flex px-1 align-center logo">
           <img src="/images/project/logo-small.png" height="56" alt="logo" class="mr-1">
           <div>
-            <div class="title font-weight-bold primary--text">SirRobot</div>
+            <div class="title font-weight-bold primary--text">Robot Boxing</div>
             <div class="overline grey--text">0.0.1-develop</div>
           </div>
         </router-link>
